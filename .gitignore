@@ -1,0 +1,11 @@
+.build/
+.swiftpm/
+dist/
+.DS_Store
+
+# Local hosting configuration
+.openai/
+
+# The landing page is maintained directly as static files.
+!website/gather-landing/dist/
+!website/gather-landing/dist/**
