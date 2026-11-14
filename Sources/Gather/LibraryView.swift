@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import GatherCore
 import UniformTypeIdentifiers
 
@@ -9,6 +10,11 @@ struct LibraryView: View {
     @FocusState private var libraryFocused: Bool
     @ViewState<CGFloat> private var libraryWidth: CGFloat = 760
     private var keyboardColumns: Int { model.listMode ? 1 : max(1, Int((libraryWidth - 48 + 16) / (model.thumbnailSize + 16))) }
+    private var textHasKeyboardFocus: Bool {
+        // AppKit text fields use an NSTextView field editor as first responder.
+        let responder = NSApp.keyWindow?.firstResponder
+        return responder is NSText || responder is NSTextField
+    }
     var body: some View {
         NavigationSplitView {
             sidebar.navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
@@ -368,11 +374,14 @@ struct LibraryView: View {
         .focused($libraryFocused)
         .onAppear { libraryFocused = true }
         .onKeyPress(.space) {
-            guard !model.batchMode, let item = model.selected else { return .ignored }
+            guard !textHasKeyboardFocus, !model.batchMode, let item = model.selected else { return .ignored }
             model.openImage(item)
             return .handled
         }
-        .onMoveCommand { model.moveSelection($0, columns: keyboardColumns) }
+        .onMoveCommand {
+            guard !textHasKeyboardFocus else { return }
+            model.moveSelection($0, columns: keyboardColumns)
+        }
         .background(Color(nsColor: .controlBackgroundColor))
         .overlay { if targeted { RoundedRectangle(cornerRadius: 12).stroke(.purple, style: StrokeStyle(lineWidth: 3, dash: [8])).padding(8).allowsHitTesting(false) } }
         .dropDestination(for: URL.self) { urls, _ in
