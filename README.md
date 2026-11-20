@@ -53,7 +53,7 @@ The filter row and screenshot cards use **actual tags from your library**, not a
 
 - ⌘I: native multi-image import; ⇧⌘I: scan a folder with candidate-count review. Drop images or one folder into the library. Explicit scans remain separate from enabling continuous watching.
 - Select a grid card or list row to see a larger preview, metadata, editable title/category/tags, favorite/review state, collection memberships, and extracted text with Copy and Retry.
-- ⌘F: search titles, original filenames, tags, OCR text and collections. SQLite FTS5 queries are debounced. Content-tag filters, grid/list, adjustable thumbnails and date/title sorting are available.
+- ⌘F: search titles, original filenames, tags, OCR text and collections. SQLite FTS5 queries are debounced. Content-tag filters, grid/list, adjustable thumbnails and date/title sorting are available. Open **Filters** to combine category, favorites, review status, text-recognition status and an inclusive capture-date range with search, tags and the selected sidebar view. **Clear filters** resets these filters and the selected tag, while keeping the search text and sidebar view.
 - Create a collection with ⇧⌘N or the sidebar. Collections are user-managed; automatic groups are computed views.
 - Space from the library opens a large downsampled preview. Arrow keys step selection; Escape closes preview. Show in Finder reveals the untouched original.
 - Missing originals can retain a cached preview. Use Grant Access to restore permissions, or Locate Original to relink an exact content match.

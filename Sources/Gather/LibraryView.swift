@@ -8,6 +8,7 @@ struct LibraryView: View {
     @ViewState<Bool> private var targeted = false
     @ViewState<[UUID: CGRect]> private var screenshotFrames = [:]
     @FocusState private var libraryFocused: Bool
+    @ViewState<Bool> private var showFilters = false
     @ViewState<CGFloat> private var libraryWidth: CGFloat = 760
     private var keyboardColumns: Int { model.listMode ? 1 : max(1, Int((libraryWidth - 48 + 16) / (model.thumbnailSize + 16))) }
     private var textHasKeyboardFocus: Bool {
@@ -39,7 +40,6 @@ struct LibraryView: View {
         }
         .disabled(model.batchBusy || model.deleting)
         .onChange(of: Set(model.visible.map(\.id))) { _, ids in model.batchSelection.formIntersection(ids) }
-        .onChange(of: model.scope) { _, _ in model.categoryFilter = nil; model.tagFilter = nil }
         .toolbar {
             ToolbarItem {
                 Button(model.batchMode ? "Done Selecting" : "Select") {
@@ -230,7 +230,44 @@ struct LibraryView: View {
                 }.frame(minHeight: 34).padding(.horizontal, 14).padding(.vertical, 9)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 11))
                     .overlay(RoundedRectangle(cornerRadius: 11).stroke(GatherTheme.accent.opacity(0.4), lineWidth: 1.5))
-                Text("Search the text inside your screenshots, titles, and tags.").font(.system(size: 12)).foregroundStyle(.secondary)
+                HStack {
+                    Text("Search the text inside your screenshots, titles, and tags.").font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button { showFilters.toggle() } label: {
+                        Label(model.hasSearchFilters ? "Filters active" : "Filters", systemImage: "line.3.horizontal.decrease.circle")
+                    }.buttonStyle(.borderless)
+                    if model.hasSearchFilters { Button("Clear filters") { model.clearSearchFilters() }.buttonStyle(.borderless) }
+                }
+                if showFilters {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Picker("Category", selection: $model.categoryFilter) {
+                                Text("All").tag(Optional<GatherCore.Category>.none)
+                                ForEach(GatherCore.Category.allCases, id: \.self) { category in
+                                    Text(category.rawValue).tag(Optional(category))
+                                }
+                            }
+                            Picker("Review", selection: $model.reviewFilter) {
+                                ForEach(ReviewFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                            }
+                            Picker("Text recognition", selection: $model.ocrFilter) {
+                                ForEach(OCRFilter.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                            }
+                        }
+                        HStack {
+                            Toggle("Favorites only", isOn: $model.favoritesOnly)
+                            Toggle("Capture date", isOn: $model.dateFilterEnabled)
+                            if model.dateFilterEnabled {
+                                DatePicker("From", selection: $model.dateFrom, displayedComponents: .date)
+                                DatePicker("Through", selection: $model.dateThrough, displayedComponents: .date)
+                            }
+                            Spacer()
+                        }
+                        if model.dateFilterEnabled && Calendar.current.startOfDay(for: model.dateFrom) > Calendar.current.startOfDay(for: model.dateThrough) {
+                            Text("Choose a start date on or before the end date.").font(.caption).foregroundStyle(.orange)
+                        }
+                    }.font(.caption).padding(12).background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+                }
             }.padding(.horizontal, 24).padding(.bottom, 22)
             if model.pendingCount > 0 || !model.automation.indexingEnabled {
                 HStack {
@@ -277,8 +314,8 @@ struct LibraryView: View {
                     }.disabled(model.busy)
                 }.frame(maxHeight: .infinity)
             } else if model.visible.isEmpty {
-                let inboxDone = model.scope == .inbox && model.query.isEmpty && !model.items.contains(where: \.inbox)
-                ContentUnavailableView(inboxDone ? "You’re all caught up" : "No screenshots here", systemImage: inboxDone ? "checkmark.circle" : "magnifyingglass", description: Text(inboxDone ? "Every screenshot has been reviewed. You can still find them in All Screenshots." : model.query.isEmpty ? "Try a different tag or collection." : "Try a different title, filename, category, or tag.")).frame(maxHeight: .infinity)
+                let inboxDone = model.scope == .inbox && model.query.isEmpty && !model.hasSearchFilters && !model.items.contains(where: \.inbox)
+                ContentUnavailableView(inboxDone ? "You’re all caught up" : "No screenshots here", systemImage: inboxDone ? "checkmark.circle" : "magnifyingglass", description: Text(inboxDone ? "Every screenshot has been reviewed. You can still find them in All Screenshots." : "Try a different search or adjust your filters.")).frame(maxHeight: .infinity)
             } else if model.listMode {
                 List(selection: $model.selectedID) {
                     ForEach(model.visible) { item in

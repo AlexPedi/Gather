@@ -6,6 +6,8 @@ import GatherCore
 enum LibraryScope: Hashable {
     case all, inbox, favorites, collection(UUID), automaticCategory(GatherCore.Category), related(String)
 }
+enum ReviewFilter: String, CaseIterable { case all = "All", unreviewed = "Unreviewed", reviewed = "Reviewed" }
+enum OCRFilter: String, CaseIterable { case all = "All", complete = "Complete", pending = "Pending", failed = "Failed" }
 enum SortOrder: String, CaseIterable { case newest = "Newest first", oldest = "Oldest first", title = "Title" }
 struct Scan: Identifiable {
     let id = UUID()
@@ -105,6 +107,17 @@ struct Scan: Identifiable {
     var applyNewTagToSelection = true
     private var tagCatalogTask: Task<Void, Never>?
     var categoryFilter: GatherCore.Category?
+    var favoritesOnly = false
+    var reviewFilter: ReviewFilter = .all
+    var ocrFilter: OCRFilter = .all
+    var dateFilterEnabled = false
+    var dateFrom = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    var dateThrough = Date()
+    var hasSearchFilters: Bool { categoryFilter != nil || favoritesOnly || reviewFilter != .all || ocrFilter != .all || dateFilterEnabled || tagFilter != nil }
+    func clearSearchFilters() {
+        categoryFilter = nil; favoritesOnly = false; reviewFilter = .all; ocrFilter = .all
+        dateFilterEnabled = false; tagFilter = nil
+    }
     var sort: SortOrder = .newest
     var listMode = false
     var thumbnailSize: Double = 220
@@ -179,7 +192,18 @@ struct Scan: Identifiable {
             }
             let names = collections.filter { item.collections.contains($0.id) }.map(\.name)
             let text = ([item.title, item.originalFilename, item.category.rawValue, item.extractedText] + item.tags + names).joined(separator: " ")
-            return inScope && (tagFilter == nil || item.tags.contains { ContentTags.key($0) == ContentTags.key(tagFilter ?? "") }) && (categoryFilter == nil || item.category == categoryFilter) && (query.isEmpty || searchMatches?.contains(item.id) == true || text.localizedCaseInsensitiveContains(query))
+            let reviewMatches = reviewFilter == .all || (reviewFilter == .unreviewed ? item.inbox : !item.inbox)
+            let ocrMatches: Bool
+            switch ocrFilter {
+            case .all: ocrMatches = true
+            case .complete: ocrMatches = item.ocrStatus == "complete"
+            case .pending: ocrMatches = item.ocrStatus == "pending" || item.ocrStatus == "processing"
+            case .failed: ocrMatches = item.ocrStatus == "failed"
+            }
+            let calendar = Calendar.current
+            let day = calendar.startOfDay(for: item.captureDate)
+            let dateMatches = !dateFilterEnabled || (day >= calendar.startOfDay(for: dateFrom) && day <= calendar.startOfDay(for: dateThrough))
+            return inScope && reviewMatches && ocrMatches && dateMatches && (!favoritesOnly || item.favorite) && (tagFilter == nil || item.tags.contains { ContentTags.key($0) == ContentTags.key(tagFilter ?? "") }) && (categoryFilter == nil || item.category == categoryFilter) && (query.isEmpty || searchMatches?.contains(item.id) == true || text.localizedCaseInsensitiveContains(query))
         }.sorted { lhs, rhs in
             switch sort {
             case .newest: lhs.captureDate == rhs.captureDate ? lhs.id.uuidString < rhs.id.uuidString : lhs.captureDate > rhs.captureDate
